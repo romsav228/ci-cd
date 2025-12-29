@@ -3,36 +3,55 @@ from enum import Enum
 
 from dotenv import load_dotenv
 from sqlalchemy import Integer, String
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 
 load_dotenv()
 
-SQL_URL = os.getenv(
-    "DATABASE_URL", "sqlite+aiosqlite:///./auth.db"
-)
+Base = declarative_base()
+
+_engine = None
+_SessionLocal = None
 
 
-engine = create_async_engine(SQL_URL, echo=True)
-db_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+def get_database_url() -> str:
+    return os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./auth.db")
+
+
+def get_engine():
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            get_database_url(),
+            echo=True,
+        )
+    return _engine
+
+
+def get_sessionmaker():
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = async_sessionmaker(
+            get_engine(),
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
+    return _SessionLocal
 
 
 async def get_db():
-    async with db_session() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
-
-
-Base = declarative_base()
+    SessionLocal = get_sessionmaker()
+    async with SessionLocal() as session:
+        yield session
 
 
 async def init_db():
+    engine = get_engine()
     async with engine.begin() as conn:
-        # # Drop all tables (be careful in production!)
-        # await conn.run_sync(Base.metadata.drop_all)
-        # Create all tables
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -44,7 +63,21 @@ class Role(str, Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True)
-    hashed_password: Mapped[str] = mapped_column(String(128))
-    user_role: Mapped[Role] = mapped_column(String(50))
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    username: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=False,
+    )
+    hashed_password: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+    )
+    user_role: Mapped[Role] = mapped_column(
+        String(50),
+        nullable=False,
+    )

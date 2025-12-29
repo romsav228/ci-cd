@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from model import Role
 
@@ -32,8 +32,9 @@ class UserModel(BaseModel):
     password: str
     role: Role = Role.user
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(
+        from_attributes=True  # Заменяем orm_mode=True
+    )
 
 
 class UserResponseModel(BaseModel):
@@ -41,5 +42,6 @@ class UserResponseModel(BaseModel):
     username: str
     role: Role
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(
+        from_attributes=True  # Заменяем orm_mode=True
+    )

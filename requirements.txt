@@ -8,4 +8,3 @@ pytest
 httpx
 aiosqlite
 pytest-asyncio
-asgi-lifespan

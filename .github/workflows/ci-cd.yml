@@ -23,24 +23,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 💾 Cache pip packages
+      - name: 💾 Cache pip
         uses: actions/cache@v3
-        id: pip-cache
         with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-
-      - name: 💾 Cache pytest
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pytest
-          key: ${{ runner.os }}-pytest-${{ hashFiles('**/*.py') }}
-          restore-keys: |
-            ${{ runner.os }}-pytest-
 
       - name: 📦 Install dependencies
         run: |
@@ -50,10 +39,10 @@ jobs:
       - name: 🧪 Run unit tests
         env:
           DATABASE_URL: sqlite+aiosqlite:///./test_auth.db
-        run: pytest tests/test_unit.py
+        run: pytest tests/test_unit.py -v
 
   staging:
-    name: 🚀 Deploy to Staging
+    name: 🚀 Staging (Build & Validate)
     runs-on: ubuntu-latest
     needs: unit-test
 
@@ -66,12 +55,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 💾 Cache pip packages
+      - name: 💾 Cache pip
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
@@ -79,15 +66,14 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt
 
-      - name: 🚀 Run staging app
-        env:
-          DATABASE_URL: sqlite+aiosqlite:///./staging_auth.db
+      - name: ✅ App import check
         run: |
-          python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
-          echo "Staging app started on port 8000"
-      
+          python - <<EOF
+          import main
+          print("App imported successfully")
+          EOF
 
   integration-test:
     name: 🧪 Integration Test
@@ -103,12 +89,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 💾 Cache pip packages
+      - name: 💾 Cache pip
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
@@ -118,9 +102,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🧪 Run integration tests
+      - name: 🚀 Start FastAPI app
         env:
           DATABASE_URL: sqlite+aiosqlite:///./integration_test_auth.db
+        run: |
+          python -m uvicorn main:app --host 127.0.0.1 --port 8000 &
+          echo "Waiting for app to start..."
+          sleep 5
+
+      - name: 🧪 Run integration tests
         run: pytest tests/test_integration.py -v
 
   production:
@@ -137,12 +127,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 💾 Cache pip packages
+      - name: 💾 Cache pip
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
@@ -159,4 +147,4 @@ jobs:
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
         run: |
           python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
-          echo "Production app started on port 8000"
+          echo "Production app started"
